@@ -23,14 +23,11 @@ import com.netflix.exhibitor.core.entities.ServerStatus;
 import com.netflix.exhibitor.core.state.InstanceStateTypes;
 import com.netflix.exhibitor.core.state.ServerList;
 import com.netflix.exhibitor.core.state.ServerSpec;
-
 import jsr166y.RecursiveTask;
-
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,7 +40,6 @@ public class ClusterStatusTask extends RecursiveTask<List<ServerStatus>>
     private final List<ServerSpec> specs;
     private final List<ServerStatus> statuses;
     private final ServerSpec us;
-    
     private final int from, to;
 
     public ClusterStatusTask(Exhibitor exhibitor, List<ServerSpec> specs)
@@ -65,7 +61,7 @@ public class ClusterStatusTask extends RecursiveTask<List<ServerStatus>>
         us = Iterables.find(specs, ServerList.isUs(exhibitor.getThisJVMHostname()), null);
     }
 
-	@Override
+    @Override
     protected List<ServerStatus> compute()
     {
         int size = (to-from);
