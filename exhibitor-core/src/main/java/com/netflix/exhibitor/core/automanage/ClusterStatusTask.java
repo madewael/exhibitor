@@ -18,18 +18,22 @@ package com.netflix.exhibitor.core.automanage;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.netflix.exhibitor.core.Exhibitor;
 import com.netflix.exhibitor.core.entities.ServerStatus;
 import com.netflix.exhibitor.core.state.InstanceStateTypes;
 import com.netflix.exhibitor.core.state.ServerList;
 import com.netflix.exhibitor.core.state.ServerSpec;
+
 import jsr166y.RecursiveTask;
+
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class ClusterStatusTask extends RecursiveTask<List<ServerStatus>>
@@ -37,21 +41,35 @@ public class ClusterStatusTask extends RecursiveTask<List<ServerStatus>>
     private final Logger log = LoggerFactory.getLogger(getClass());
     private final Exhibitor exhibitor;
     private final List<ServerSpec> specs;
+    private final List<ServerStatus> statuses;
     private final ServerSpec us;
+    
+    private final int from, to;
 
     public ClusterStatusTask(Exhibitor exhibitor, List<ServerSpec> specs)
     {
+    	this(exhibitor, specs, 0, specs.size());
+    }
+    
+    public ClusterStatusTask(Exhibitor exhibitor, List<ServerSpec> specs, int from, int to)
+    {
         this.exhibitor = exhibitor;
         this.specs = ImmutableList.copyOf(specs);
+        
+        // Create "target"-list of equal size.
+        this.statuses = new ArrayList<ServerStatus>( Arrays.asList( new ServerStatus[ specs.size() ] ) );
+        
+        this.from = from;
+        this.to = to;
+        
         us = Iterables.find(specs, ServerList.isUs(exhibitor.getThisJVMHostname()), null);
     }
 
-    @Override
+	@Override
     protected List<ServerStatus> compute()
     {
-        List<ServerStatus>      statuses = Lists.newArrayList();
-
-        int size = specs.size();
+        int size = (to-from);
+        
         switch ( size )
         {
             case 0:
@@ -61,24 +79,15 @@ public class ClusterStatusTask extends RecursiveTask<List<ServerStatus>>
 
             case 1:
             {
-                statuses.add(getStatus(specs.get(0)));
+                statuses.set(from, getStatus(specs.get(from)));
                 break;
             }
 
             default:
             {
-                List<ClusterStatusTask> tasks = Lists.newArrayList();
-                for ( List<ServerSpec> subList : Lists.partition(specs, size / 2) )
-                {
-                    ClusterStatusTask task = new ClusterStatusTask(exhibitor, subList);
-                    task.fork();
-                    tasks.add(task);
-                }
-
-                for ( ClusterStatusTask task : tasks )
-                {
-                    statuses.addAll(task.join());
-                }
+                int mid = (from+to)/2;
+                invokeAll( new ClusterStatusTask(exhibitor, specs, from, mid),
+                		   new ClusterStatusTask(exhibitor, specs, mid, to));
                 break;
             }
         }
